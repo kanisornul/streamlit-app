@@ -8,13 +8,14 @@ def install_missing_packages():
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", 
                              "geopandas==0.14.1",
-                             "matplotlib==3.8.2",
+                             "folium==0.15.1",
                              "pandas==2.2.0",
                              "numpy==1.26.3",
                              "pyproj==3.6.1",
                              "shapely==2.0.2",
                              "fiona==1.9.5",
-                             "rtree==1.1.0"])
+                             "rtree==1.1.0",
+                             "streamlit-folium==0.18.0"])
         return True
     except Exception as e:
         st.error(f"Failed to install packages: {str(e)}")
@@ -23,12 +24,10 @@ def install_missing_packages():
 # Try importing required packages
 try:
     import geopandas as gpd
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-    from matplotlib.figure import Figure
+    import folium
+    from streamlit_folium import folium_static
     import pandas as pd
     from pathlib import Path
-    import pickle
 except ImportError as e:
     st.error(f"Missing required packages: {str(e)}")
     if install_missing_packages():
@@ -68,11 +67,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Safe data loading with error handling
 @st.cache_data
 def load_geojson():
     try:
-        # First try the data directory
         data_paths = [
             "thailand-provinces.geojson",
             "data/thailand-provinces.geojson",
@@ -90,48 +87,57 @@ def load_geojson():
         st.error(f"Error loading data: {str(e)}")
         return None
 
-@st.cache_data
-def create_map(_data, selected_provinces=None):
+def create_folium_map(data, selected_provinces=None):
     try:
-        # Create figure with subplot and toolbar
-        fig = plt.figure(figsize=(8, 10), dpi=100)
-        ax = fig.add_subplot(111)
+        # Get the center of Thailand for the initial view
+        center_lat = data.geometry.centroid.y.mean()
+        center_lon = data.geometry.centroid.x.mean()
         
-        # Enable the navigation toolbar
-        plt.rcParams['toolbar'] = 'toolmanager'
+        # Create the base map
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=6,
+            tiles='CartoDB positron'
+        )
         
-        if selected_provinces:
-            _data.plot(ax=ax, color='#E6E6E6', edgecolor='white', linewidth=0.5)
-            _data[_data['NAME_1'].isin(selected_provinces)].plot(
-                ax=ax,
-                color='#ADD8E6',
-                edgecolor='white',
-                linewidth=0.5
+        # Function to style the provinces
+        def style_function(feature):
+            province_name = feature['properties']['NAME_1']
+            if selected_provinces and province_name in selected_provinces:
+                return {
+                    'fillColor': '#ADD8E6',
+                    'fillOpacity': 0.7,
+                    'color': 'white',
+                    'weight': 1,
+                }
+            return {
+                'fillColor': '#E6E6E6',
+                'fillOpacity': 0.7,
+                'color': 'white',
+                'weight': 1,
+            }
+        
+        # Add hover functionality
+        def highlight_function(feature):
+            return {
+                'fillOpacity': 0.9,
+                'weight': 2,
+            }
+        
+        # Add GeoJson layer with tooltips
+        folium.GeoJson(
+            data.__geo_interface__,
+            style_function=style_function,
+            highlight_function=highlight_function,
+            tooltip=folium.GeoJsonTooltip(
+                fields=['NAME_1'],
+                aliases=['Province:'],
+                style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
             )
-        else:
-            _data.plot(ax=ax, color='#E6E6E6', edgecolor='white', linewidth=0.5)
+        ).add_to(m)
         
-        bounds = _data.total_bounds
-        ax.set_xlim(bounds[0] - 0.5, bounds[2] + 0.5)
-        ax.set_ylim(bounds[1] - 0.5, bounds[3] + 0.5)
+        return m
         
-        ax.set_title("Thailand Provinces", pad=10, fontsize=12)
-        
-        # Add zoom and pan instructions
-        ax.text(0.02, 0.02, 
-                "Use mousewheel to zoom\nClick and drag to pan",
-                transform=ax.transAxes,
-                fontsize=8,
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
-        
-        plt.tight_layout(pad=0.5)
-        
-        # Enable interactive features
-        fig.canvas.toolbar_visible = True
-        fig.canvas.header_visible = False
-        fig.canvas.footer_visible = False
-        
-        return fig
     except Exception as e:
         st.error(f"Error creating map: {str(e)}")
         return None
@@ -174,20 +180,22 @@ def main():
                 options=province_options,
                 key='province_selector'
             )
-            
-            # Add reset view button
-            if st.button("Reset View"):
-                st.session_state['map_view'] = None
 
         create_metrics_section(thailand_map, selected_provinces)
         
         col1, col2 = st.columns([0.6, 0.4])
 
         with col1:
-            fig = create_map(thailand_map, selected_provinces)
-            if fig is not None:
-                # Create the plot with interactive features enabled
-                st.pyplot(fig, use_container_width=True)
+            folium_map = create_folium_map(thailand_map, selected_provinces)
+            if folium_map is not None:
+                # Display the map with folium_static
+                folium_static(folium_map, width=700, height=500)
+                
+                # Add instructions
+                st.caption("Map Controls:")
+                st.caption("• Use +/- buttons or mousewheel to zoom")
+                st.caption("• Click and drag to pan")
+                st.caption("• Hover over provinces to see names")
 
         with col2:
             with st.expander("Province Details", expanded=True):
