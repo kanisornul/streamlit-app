@@ -24,6 +24,8 @@ def install_missing_packages():
 try:
     import geopandas as gpd
     import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.figure import Figure
     import pandas as pd
     from pathlib import Path
     import pickle
@@ -91,7 +93,12 @@ def load_geojson():
 @st.cache_data
 def create_map(_data, selected_provinces=None):
     try:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 10), dpi=100)
+        # Create figure with subplot and toolbar
+        fig = plt.figure(figsize=(8, 10), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # Enable the navigation toolbar
+        plt.rcParams['toolbar'] = 'toolmanager'
         
         if selected_provinces:
             _data.plot(ax=ax, color='#E6E6E6', edgecolor='white', linewidth=0.5)
@@ -109,8 +116,20 @@ def create_map(_data, selected_provinces=None):
         ax.set_ylim(bounds[1] - 0.5, bounds[3] + 0.5)
         
         ax.set_title("Thailand Provinces", pad=10, fontsize=12)
-        ax.set_axis_off()
+        
+        # Add zoom and pan instructions
+        ax.text(0.02, 0.02, 
+                "Use mousewheel to zoom\nClick and drag to pan",
+                transform=ax.transAxes,
+                fontsize=8,
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        
         plt.tight_layout(pad=0.5)
+        
+        # Enable interactive features
+        fig.canvas.toolbar_visible = True
+        fig.canvas.header_visible = False
+        fig.canvas.footer_visible = False
         
         return fig
     except Exception as e:
@@ -155,6 +174,10 @@ def main():
                 options=province_options,
                 key='province_selector'
             )
+            
+            # Add reset view button
+            if st.button("Reset View"):
+                st.session_state['map_view'] = None
 
         create_metrics_section(thailand_map, selected_provinces)
         
@@ -163,6 +186,7 @@ def main():
         with col1:
             fig = create_map(thailand_map, selected_provinces)
             if fig is not None:
+                # Create the plot with interactive features enabled
                 st.pyplot(fig, use_container_width=True)
 
         with col2:
