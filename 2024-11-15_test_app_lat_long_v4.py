@@ -312,7 +312,7 @@ def main():
     st.title("Model Performance on Prediction Correctness")
     
     # Load data
-    raw_df = load_and_preprocess_data(r"/Users/kanisornunjittikul/streamlit-app/streamlit-app-1/correct_dataset2")
+    raw_df = load_and_preprocess_data(r"/Users/kanisornunjittikul/streamlit-app/correct_dataset2")
     if raw_df is None:
         return
     
