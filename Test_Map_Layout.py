@@ -62,7 +62,7 @@ st.markdown("""
         }
         [data-testid="stSidebar"] {
             min-width: 220px !important;
-            max-width: 220px !important;
+            max-width: 300px !important;
         }
     </style>
 """, unsafe_allow_html=True)
