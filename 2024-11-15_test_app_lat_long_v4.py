@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import branca.colormap as cm
 import plotly.graph_objects as go
-
+import joblib
 
 
 # Run the Streamlit app configuration at the very start
@@ -25,7 +25,7 @@ st.markdown("""
     <style>
         .main > div {padding-top: 0.5rem; padding-left: 1rem; padding-right: 1rem;}
         .stSidebar > div {padding-top: 1.5rem; padding-left: 1rem; padding-right: 1rem;}
-        [data-testid="stSidebar"] {min-width: 220px !important; max-width: 220px !important;}
+        [data-testid="stSidebar"] {min-width: 220px !important; max-width: px !important;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -312,7 +312,7 @@ def main():
     st.title("Model Performance on Prediction Correctness")
     
     # Load data
-    raw_df = load_and_preprocess_data(r"C:\Users\User\OneDrive\Desktop\Chula Stat\Semester 1\Data Visualization\Project 3\correct_dataset3")
+    raw_df = load_and_preprocess_data(r"/Users/kanisornunjittikul/streamlit-app/streamlit-app-1/correct_dataset2")
     if raw_df is None:
         return
     
@@ -399,7 +399,7 @@ def main():
         max_points = st.slider("Max Points on Map", 100, 1000, 500)
     
     # Display layout
-    col1, col2 = st.columns([7, 3])
+    col1, col2 = st.columns([5, 3])
     
     with col1:
         entities_text = ", ".join([k for k, v in entity_options.items() if v in selected_entities])
@@ -407,13 +407,15 @@ def main():
         
         # Display data type and entity information
         data_type_text = f"Data Type: {selected_data_type}"
-        st.text(data_type_text)
-        st.text(f"Address Components for %Correctness Calculation: {entities_text}")
+        st.write(data_type_text)
+        st.write(f"Example Data: ")
+        st.write(f"Address Components for %Correctness Calculation: {entities_text}")
+        
         
         selected_level = None if selected_region == 'All' else selected_region
         m = create_optimized_map(df, group_col, selected_level, min_recall, max_points)
         if m:
-            st_folium(m, width=800, height=700)
+            st_folium(m, width=550, height=650)
     
     with col2:
         filtered_df = df[df[('recall_per_row', 'mean')] >= min_recall]
@@ -443,5 +445,102 @@ def main():
             if chart:
                 st.plotly_chart(chart, use_container_width=True)
 
+
 if __name__ == "__main__":
     main()
+
+
+## Model Part
+
+# Load the pre-trained model
+@st.cache_data
+def load_model():
+    model = joblib.load("NER_model.joblib")
+    return model
+
+model = load_model()
+
+# Define stopwords
+stopwords = ["ผู้", "ที่", "ซึ่ง", "อัน"]
+
+def tokens_to_features(tokens, i):
+    word = tokens[i]
+    features = {
+        "bias": 1.0,
+        "word.word": word,
+        "word[:3]": word[:3],
+        "word.isspace()": word.isspace(),
+        "word.is_stopword()": word in stopwords,
+        "word.isdigit()": word.isdigit(),
+        "word.islen5": word.isdigit() and len(word) == 5,
+    }
+    
+    if i > 0:
+        prevword = tokens[i - 1]
+        features.update({
+            "-1.word.prevword": prevword,
+            "-1.word.isspace()": prevword.isspace(),
+            "-1.word.is_stopword()": prevword in stopwords,
+            "-1.word.isdigit()": prevword.isdigit(),
+        })
+    else:
+        features["BOS"] = True
+    
+    if i < len(tokens) - 1:
+        nextword = tokens[i + 1]
+        features.update({
+            "+1.word.nextword": nextword,
+            "+1.word.isspace()": nextword.isspace(),
+            "+1.word.is_stopword()": nextword in stopwords,
+            "+1.word.isdigit()": nextword.isdigit(),
+        })
+    else:
+        features["EOS"] = True
+    
+    return features
+
+def parse(text):
+    tokens = text.split()  # Tokenize the input text by space
+    features = [tokens_to_features(tokens, i) for i in range(len(tokens))]
+    
+    # Make predictions using the model
+    prediction = model.predict([features])[0]
+    
+    return tokens, prediction
+
+# Add explanation mapping for predictions
+def map_explanation(label):
+    explanation = {
+        "LOC": "Location (Tambon, Amphoe, Province)",
+        "POST": "Postal Code",
+        "ADDR": "Other Address Element",
+        "O": "Not an Address"
+    }
+    return explanation.get(label, "Unknown")
+
+# Set up the Streamlit app
+st.title("Let try Named Entity Recognition (NER) model!")
+
+# Example input for NER analysis
+example_input = "นายสมชาย เข็มกลัด 254 ถนน พญาไท แขวง วังใหม่ เขต ปทุมวัน กรุงเทพมหานคร 10330"
+
+# Text input for user data with the example as placeholder text
+user_text = st.text_area("Enter your address:", value="", placeholder=example_input)
+
+# Button to make predictions
+if st.button("Predict!"):
+    # Make predictions
+    tokens, predictions = parse(user_text)
+
+    # Add explanations to predictions
+    explanations = [map_explanation(pred) for pred in predictions]
+
+    # Create a horizontal table
+    data = pd.DataFrame([predictions, explanations], columns=tokens, index=["Prediction", "Explanation"])
+
+    # Display the results
+    st.write("Tokenized Results and Predictions with Explanations (Horizontal Table):")
+    st.dataframe(data)
+
+
+ # streamlit run 2024-11-15_test_app_lat_long_v4.py    
