@@ -58,3 +58,4 @@ rtree>=1.1
 folium==0.15.1
 streamlit-folium==0.18.0
 plotly==5.17.0
+wordcloud==1.9.4
