@@ -18,7 +18,8 @@ import numpy as np
 from wordcloud import WordCloud, get_single_color_func
 
 # theme
-primary_color = "#1e90ff"
+base="light"
+primaryColor="#1e90ff"
 default_text_color ="#555555"
 
 
