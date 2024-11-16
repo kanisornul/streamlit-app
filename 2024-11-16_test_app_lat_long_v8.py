@@ -19,7 +19,7 @@ from wordcloud import WordCloud, get_single_color_func
 
 # theme
 base="light"
-primaryColor="#1e90ff"
+primary_color = "#1e90ff"
 default_text_color ="#555555"
 
 
