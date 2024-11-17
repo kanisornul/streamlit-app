@@ -310,7 +310,7 @@ def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0, max
 
 # Create word cloud
 
-font_path_ttf = '/Users/kanisornunjittikul/streamlit-app/THSarabunNew.ttf'
+font_path_ttf = 'THSarabunNew.ttf'
 
 
 def get_colors_for_word(recall_value):
@@ -508,7 +508,7 @@ def main():
     flexible_info("Welcome! This app lets you explore how a simple CRF-based Named Entity Recognition (NER) model predicts Thai address components. It tags each part as LOC (tambon, amphoe, or province), POST (postal code), ADDR (other address elements), or O (non-address elements).")
 
     # Load data
-    raw_df = load_and_preprocess_data(r"/Users/kanisornunjittikul/streamlit-app/correct_dataset3")
+    raw_df = load_and_preprocess_data(r"correct_dataset3")
     if raw_df is None:
         return
     
@@ -866,7 +866,7 @@ if __name__ == "__main__":
 # Load the pre-trained model
 @st.cache_data
 def load_model():
-    model_path = '/Users/kanisornunjittikul/streamlit-app/NER_model.joblib'
+    model_path = 'NER_model.joblib'
     if os.path.exists(model_path):
         try:
             model = joblib.load(model_path)
