@@ -174,7 +174,7 @@ color_dict = {
 }
 
 @st.cache_data
-def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0): #, max_points=1000):
+def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0, max_recall=1.0): #, max_points=1000):
     """Create map with enhanced circle markers and proper coordinate handling"""
     thailand_center = [13.7563, 100.5018]
     
@@ -212,7 +212,11 @@ def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0): #,
             return color_dict['very_low_recall']['color'] # Default return if no category is found
 
         # Filter data
-        filtered_df = df[df[('recall_per_row', 'mean')] >= min_recall]
+        # filtered_df = df[df[('recall_per_row', 'mean')] >= min_recall]
+        filtered_df = df[
+                            (df[('recall_per_row', 'mean')] >= min_recall) & 
+                            (df[('recall_per_row', 'mean')] <= max_recall)
+                        ]
         if selected_level:
             filtered_df = filtered_df.loc[[selected_level]]
         
@@ -516,20 +520,36 @@ def main():
                 st.rerun()
 
 
-        st.markdown("### Data and Filters")
-        
+        # st.markdown("### Data and Filters")
+        # st.markdown("### Address Format")
+        st.markdown("""
+            <div class="header-with-icon">
+                <h3 style="margin: 0;">Address Format</h3>
+                <div class="tooltip-icon">
+                    ℹ️
+                    <div class="tooltip-text">
+                        Multiple Thai address formats were generated to evaluate variations in model performance based on %Prediction Correctness.
+                        <br><br>
+                        The dataset combines real Thai administrative data (district, subdistrict, zipcode, and province) with synthetic data (names, house numbers, and streets) created using the Faker library.
+                        <br><br>
+                        Three address formats were tested:
+                        <br>
+                        1. Correct with Full Prefix: Includes "ตำบล" and "อำเภอ" before subdistrict and district.
+                        <br>
+                        2. Correct with Short Prefix: Includes "ต." and "อ." before subdistrict and district.
+                        <br>
+                        3. Correct without Prefix: No prefixes before address components.
+                    </div>
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
         # Data Type filter
-        st.markdown("<b>Data Type:</b>", unsafe_allow_html=True)
+        # st.markdown("<b>Data Type:</b>", unsafe_allow_html=True)
         data_types = ['All'] + sorted(raw_df['data_type'].unique().tolist())
-        temp_data_type = st.selectbox("Select Data Type", data_types)
+        temp_data_type = st.selectbox("Select Address Format", data_types)
                 
-
-        # Tooltip for Prediction Correctness
-        tooltip_text = """
-        Prediction Correctness (%) measures how accurately the NER model identifies predefined Thai address components (district, subdistrict, zipcode, and province) in auto-generated data.
-        <br><br>
-        It is calculated as the number of correctly predicted address components divided by the total number of selected address components, expressed as a percentage.
-        """
 
 
         st.markdown("<hr style='margin: 1rem 0'>", unsafe_allow_html=True)
@@ -604,15 +624,28 @@ def main():
         else:
             temp_selected_region = 'All'
         
-        # Percentage format for min recall
-        temp_min_recall = st.slider(
-            "Minimum %Prediction Correctness",
+        # # Percentage format for min recall
+        # temp_min_recall = st.slider(
+        #     "Minimum %Prediction Correctness",
+        #     min_value=0,
+        #     max_value=100,
+        #     value=0,
+        #     step=5,
+        #     format="%d%%"
+        # ) / 100.0
+
+        # Percentage range for prediction correctness
+        temp_min_recall, temp_max_recall = st.slider(
+            "%Prediction Correctness Range",
             min_value=0,
             max_value=100,
-            value=0,
+            value=(0, 100),  # default range from 0 to 100
             step=5,
             format="%d%%"
-        ) / 100.0
+        )
+        # Convert percentages to decimals
+        temp_min_recall = temp_min_recall / 100.0
+        temp_max_recall = temp_max_recall / 100.0
         
         # Auto-apply just once at start
         if st.session_state.get('needs_initial_apply', True):
@@ -622,6 +655,7 @@ def main():
                 'selected_group': temp_selected_group,
                 'selected_region': temp_selected_region,
                 'min_recall': temp_min_recall,
+                'max_recall': temp_max_recall,
                 'group_col': temp_group_col
             })
             st.session_state.needs_initial_apply = False
@@ -636,6 +670,7 @@ def main():
                 'selected_group': temp_selected_group,
                 'selected_region': temp_selected_region,
                 'min_recall': temp_min_recall,
+                'max_recall': temp_max_recall,
                 'group_col': temp_group_col
             })
             # st.experimental_rerun()
@@ -670,7 +705,7 @@ def main():
         st.markdown(f"### By <span style='color: {primary_color};'> {settings['selected_group']} </span>", unsafe_allow_html=True)
         
         # Display data type and entity information
-        data_type_text = f"Data Type: {settings['data_type']}"
+        data_type_text = f"Address Format: {settings['data_type']}"
         st.write(data_type_text)
 
         
@@ -678,7 +713,8 @@ def main():
         st.write(f"Address Components for %Correctness Calculation: {entities_text}")
         
         selected_level = None if settings['selected_region'] == 'All' else settings['selected_region']
-        m = create_optimized_map(df, group_col, selected_level, settings['min_recall'])
+        # m = create_optimized_map(df, group_col, selected_level, settings['min_recall'])
+        m = create_optimized_map(df, group_col, selected_level, settings['min_recall'], settings['max_recall'])
         if m:
             st_folium(m
                       ,width=550
@@ -697,7 +733,7 @@ def main():
                 # Get one random sample for each data_type
                 sample = raw_df[raw_df['data_type'] == data_type].sample(n=1).iloc[0]['address_with_name']
                 # Append the sample with its data type
-                random_samples.append({"Data Type": data_type, "Address": sample})
+                random_samples.append({"Address Format": data_type, "Address": sample})
 
             # Convert the list of random samples into a DataFrame for table display
             random_samples_df = pd.DataFrame(random_samples)
@@ -710,18 +746,22 @@ def main():
                 # Get one random sample for the specific data_type
                 random_sample = raw_df[raw_df['data_type'] == temp_data_type].sample(n=1).iloc[0]['address_with_name']
             else:
-                random_sample = "No data available for this type."
+                random_sample = "No sample available for this address format."
 
         # Now display the random samples as a table (if temp_data_type == 'All')
         if temp_data_type == 'All':
-            st.write("Example Address for Each Data Type")
+            st.write("Sample Address for Each Address Format")
             st.dataframe(random_samples_df, hide_index = True) 
         else:
-            st.write(f"Example address for {temp_data_type}:")
+            st.write(f"Random Sample for {temp_data_type} Address Format:")
             st.write(random_sample)    
     
     with col2:
-        filtered_df = df[df[('recall_per_row', 'mean')] >= settings['min_recall']]
+        # filtered_df = df[df[('recall_per_row', 'mean')] >= settings['min_recall']]
+        filtered_df = df[
+                        (df[('recall_per_row', 'mean')] >= settings['min_recall']) & 
+                        (df[('recall_per_row', 'mean')] <= settings['max_recall'])
+                        ]
         if settings['selected_region'] != 'All':
             filtered_df = filtered_df.loc[[settings['selected_region']]]
  
@@ -897,4 +937,4 @@ if st.button("Predict!"):
     st.dataframe(data)
 
 
- # streamlit run 2024-11-16_test_app_lat_long_v8.py    
+ # streamlit run 2024-11-16_test_app_lat_long_v10.py    
