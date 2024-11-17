@@ -17,6 +17,7 @@ from PIL import ImageFont, ImageDraw, Image
 import numpy as np
 from wordcloud import WordCloud, get_single_color_func
 import os
+from st_flexible_callout_elements import flexible_error, flexible_success, flexible_warning, flexible_info
 
 # theme
 primary_color = "#1e90ff"
@@ -231,7 +232,7 @@ def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0, max
             fill_color, border_color = get_colors_for_map(recall_value)
             
             info_text = f"{idx}: {recall_value:.1%}"
-            detailed_text = f"{idx}: {recall_value:.1%} (n={count})"
+            detailed_text = f"{idx}: {recall_value:.1%} (Address sample={count})"
             
             folium.CircleMarker(
                 location=[lat, lon],
@@ -502,7 +503,10 @@ def create_word_cloud_bottom(df, selected_group='Province'):
 
 def main():
     st.title("Model Performance on Prediction Correctness")
-    
+
+    # Model description
+    flexible_info("Welcome! This app lets you explore how a simple CRF-based Named Entity Recognition (NER) model predicts Thai address components. It tags each part as LOC (tambon, amphoe, or province), POST (postal code), ADDR (other address elements), or O (non-address elements).")
+
     # Load data
     raw_df = load_and_preprocess_data(r"correct_dataset3")
     if raw_df is None:
@@ -548,7 +552,16 @@ def main():
         # Data Type filter
         # st.markdown("<b>Data Type:</b>", unsafe_allow_html=True)
         data_types = ['All'] + sorted(raw_df['data_type'].unique().tolist())
-        temp_data_type = st.selectbox("Select Address Format", data_types)
+
+        # Change description
+        temp_data_type_list = [
+            "ตำบล อำเภอ" if data_type == "Correct with Full Prefix" else
+            "ต. อ." if data_type == "Correct with Short Prefix" else
+            "No Prefix" if data_type == "Correct without Prefix" else
+            "All"
+            for data_type in data_types
+]
+        temp_data_type = st.selectbox("Select Address Format", options=data_types, format_func=lambda x: temp_data_type_list[data_types.index(x)])
                 
 
 
