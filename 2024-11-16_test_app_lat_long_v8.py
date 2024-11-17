@@ -310,7 +310,7 @@ def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0, max
 
 # Create word cloud
 
-font_path_ttf = 'THSarabunNew.ttf'
+font_path_ttf = '/Users/kanisornunjittikul/streamlit-app/THSarabunNew.ttf'
 
 
 def get_colors_for_word(recall_value):
@@ -508,7 +508,7 @@ def main():
     flexible_info("Welcome! This app lets you explore how a simple CRF-based Named Entity Recognition (NER) model predicts Thai address components. It tags each part as LOC (tambon, amphoe, or province), POST (postal code), ADDR (other address elements), or O (non-address elements).")
 
     # Load data
-    raw_df = load_and_preprocess_data(r"correct_dataset3")
+    raw_df = load_and_preprocess_data(r"/Users/kanisornunjittikul/streamlit-app/correct_dataset3")
     if raw_df is None:
         return
     
@@ -736,38 +736,54 @@ def main():
                       ,returned_objects=[]  # Add this to prevent returning unnecessary data
                       )
 
-        #Sample Addrress for Each Data Type
+        # Function to map data_type to its corresponding description
+        def assign_temp_data_type(data_type):
+            if data_type == "Correct with Full Prefix":
+                return "ตำบล อำเภอ"
+            elif data_type == "Correct with Short Prefix":
+                return "ต. อ."
+            elif data_type == "Correct without Prefix":
+                return "No Prefix"
+            else:
+                return "Others"
+
+        # Handle 'All' case
         if temp_data_type == 'All':
-            # Create an empty list to store random samples for each data type
+            # Create a list to store random samples for each data_type
             random_samples = []
 
             # Loop through each unique 'data_type' in raw_df
             for data_type in raw_df['data_type'].unique():
                 # Get one random sample for each data_type
                 sample = raw_df[raw_df['data_type'] == data_type].sample(n=1).iloc[0]['address_with_name']
-                # Append the sample with its data type
-                random_samples.append({"Address Format": data_type, "Address": sample})
+                # Append the sample with its description
+                random_samples.append({
+                    "Address Format": assign_temp_data_type(data_type),  # Map description
+                    "Address": sample
+                })
 
-            # Convert the list of random samples into a DataFrame for table display
+            # Convert the list of random samples into a DataFrame for display
             random_samples_df = pd.DataFrame(random_samples)
 
-            # Drop the first index column before displaying
+            # Reset index for a clean table display
             random_samples_df.reset_index(drop=True, inplace=True)
 
         else:
+            # Handle specific data_type case
             if not raw_df.empty:
                 # Get one random sample for the specific data_type
                 random_sample = raw_df[raw_df['data_type'] == temp_data_type].sample(n=1).iloc[0]['address_with_name']
             else:
                 random_sample = "No sample available for this address format."
 
-        # Now display the random samples as a table (if temp_data_type == 'All')
+        # Display the results
         if temp_data_type == 'All':
             st.write("Sample Address for Each Address Format")
-            st.dataframe(random_samples_df, hide_index = True) 
+            st.dataframe(random_samples_df, use_container_width=True, hide_index=True)
         else:
             st.write(f"Random Sample for {temp_data_type} Address Format:")
-            st.write(random_sample)    
+            st.write(random_sample)
+    
     
     with col2:
         # filtered_df = df[df[('recall_per_row', 'mean')] >= settings['min_recall']]
@@ -850,7 +866,7 @@ if __name__ == "__main__":
 # Load the pre-trained model
 @st.cache_data
 def load_model():
-    model_path = 'NER_model.joblib'
+    model_path = '/Users/kanisornunjittikul/streamlit-app/NER_model.joblib'
     if os.path.exists(model_path):
         try:
             model = joblib.load(model_path)
@@ -950,4 +966,5 @@ if st.button("Predict!"):
     st.dataframe(data)
 
 
- # streamlit run 2024-11-16_test_app_lat_long_v10.py    
+ # streamlit run 2024-11-16_test_app_lat_long_v10.py
+ # /Users/kanisornunjittikul/streamlit-app
