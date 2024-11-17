@@ -714,10 +714,10 @@ def main():
 
         # Now display the random samples as a table (if temp_data_type == 'All')
         if temp_data_type == 'All':
-            st.write("Sample Address for Each Data Type")
+            st.write("Example Address for Each Data Type")
             st.dataframe(random_samples_df, hide_index = True) 
         else:
-            st.write(f"Random Sample for {temp_data_type}:")
+            st.write(f"Example address for {temp_data_type}:")
             st.write(random_sample)    
     
     with col2:
