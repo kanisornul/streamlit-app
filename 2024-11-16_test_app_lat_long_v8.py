@@ -718,7 +718,21 @@ def main():
         st.markdown(f"### By <span style='color: {primary_color};'> {settings['selected_group']} </span>", unsafe_allow_html=True)
         
         # Display data type and entity information
-        data_type_text = f"Address Format: {settings['data_type']}"
+        data_type = settings['data_type']
+       # Check if data_type exists in the data_types list and map it
+        if data_type in data_types:
+            # Find the index of the selected data_type in the data_types list
+            index = data_types.index(data_type)
+            
+            # Map it to the corresponding description in temp_data_type_list
+            mapped_data_type = temp_data_type_list[index]
+        else:
+            mapped_data_type = "Unknown"  # In case the data_type is not in data_types
+
+        # Create the display text
+        data_type_text = f"Address Format: {mapped_data_type}"
+
+        # Display the result
         st.write(data_type_text)
 
         
@@ -967,4 +981,4 @@ if st.button("Predict!"):
 
 
  # streamlit run 2024-11-16_test_app_lat_long_v10.py
- # /Users/kanisornunjittikul/streamlit-app
+ # /Users/kanisornunjittikul/streamlit-app/
