@@ -16,11 +16,16 @@ import matplotlib.font_manager as fm
 from PIL import ImageFont, ImageDraw, Image
 import numpy as np
 from wordcloud import WordCloud, get_single_color_func
+import os
 
 # theme
-base="light"
 primary_color = "#1e90ff"
 default_text_color ="#555555"
+
+#just_added
+# At the top of your script, add this new session state variable
+if 'first_load' not in st.session_state:
+    st.session_state.first_load = True
 
 
 # Run the Streamlit app configuration at the very start
@@ -32,24 +37,59 @@ if 'data_loaded' not in st.session_state:
         initial_sidebar_state="expanded",
         menu_items={'Get Help': None, 'Report a bug': None, 'About': None}
     )
-    st.session_state.data_loaded = True
 
-
-# Add session state for storing filter settings
-if 'filter_settings' not in st.session_state:
+    # Initialize filter settings when app first loads
     st.session_state.filter_settings = {
         'data_type': 'All',
-        'selected_entities': [],
+        'selected_entities': ['m_subdistrict_flag', 'm_district_flag', 'm_province_flag', 'm_zipcode_flag'],
         'selected_group': 'Province',
         'selected_region': 'All',
-        'min_recall': 0.0
+        'min_recall': 0.0,
+        'group_col': 'province'
     }
+    st.session_state.data_loaded = True
+    # Add show_popup state
+    st.session_state.show_popup = True
+    st.session_state.needs_initial_apply = True  # New flag
+
 
 st.markdown("""
     <style>
+        /* Your existing styles */
         .main > div {padding-top: 0.1rem; padding-left: 1rem; padding-right: 1rem;}
         .stSidebar > div {padding-top: 1.5rem; padding-left: 1rem; padding-right: 1rem;}
         [data-testid="stSidebar"] {min-width: 220px !important; max-width: px !important;}
+        
+        /* Updated tooltip styles */
+        .header-with-icon {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tooltip-icon {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            padding-top: 5px;  /* Align with header */
+        }
+        .tooltip-text {
+            display: none;
+            position: absolute;
+            width: 250px;  /* Adjusted width */
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            left: -125px;  /* Center the tooltip */
+            top: 25px;     /* Position below the icon */
+        }
+        .tooltip-icon:hover .tooltip-text {
+            display: block;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,16 +140,6 @@ def calculate_metrics(_df, selected_entities, selected_data_type='All'):
     except Exception as e:
         st.error(f"Error calculating metrics: {str(e)}")
         return None, None
-
-
-# #for province border on hover
-# @st.cache_data
-# def load_thailand_geojson():
-#     """Load Thailand province boundaries"""
-#     # You'll need to get Thailand GeoJSON data - this is a placeholder path
-#     geojson_path = r"C:\Users\User\OneDrive\Desktop\Chula Stat\Semester 1\Data Visualization\Project 3\thailand-provinces.geojson"
-#     with open(geojson_path) as f:
-#         return json.load(f)
 
 # Add this helper function
 def safe_float_conversion(value):
@@ -186,10 +216,7 @@ def create_optimized_map(df, group_col, selected_level=None, min_recall=0.0): #,
         if selected_level:
             filtered_df = filtered_df.loc[[selected_level]]
         
-        # # Sample if too many points
-        # if len(filtered_df) > max_points:
-        #     filtered_df = filtered_df.sample(n=max_points)
-            
+
         # Add circle markers with enhanced styling
         for idx, row in filtered_df.iterrows():
             lat = safe_float_conversion(row['latitude'])
@@ -301,17 +328,20 @@ class CustomColorFunc(object):
 
 
 @st.cache_data
-def create_word_cloud_top(df):
+def create_word_cloud_top(df, selected_group='Province'):
     """Create word clouds for top regions with error handling"""
     try:
         # Check if dataframe is empty or has less than required data
         if df.empty:
             st.warning("No data available for word clouds.")
-            return None, None, None
+            return None, None #, None # Changed to return only two values
 
         # Convert tuple index to string if it's a tuple
         if isinstance(df.index[0], tuple):
             df.index = [' '.join(map(str, idx)) for idx in df.index]
+
+        # Always convert index to string (for postal codes)
+        df.index = df.index.astype(str)
 
         # Create a simpler DataFrame with just the required columns
         simple_df = pd.DataFrame({
@@ -326,7 +356,7 @@ def create_word_cloud_top(df):
         n_items = min(10, len(sorted_df))
         if n_items == 0:
             st.warning("Not enough data points for word clouds.")
-            return None, None, None
+            return None, None #, None
 
         top_10 = sorted_df.head(n_items)
         # bottom_10 = sorted_df.tail(n_items)
@@ -356,7 +386,7 @@ def create_word_cloud_top(df):
         # Plot top regions
         ax1.imshow(wc_top, interpolation='bilinear')
         ax1.axis('off')
-        ax1.set_title('Most Accurate Regions', pad=20, fontsize=16, color=default_text_color)
+        ax1.set_title(f'Most Accurate {selected_group}s', pad=20, fontsize=16, color=default_text_color)
 
 
         # Adjust layout
@@ -375,20 +405,23 @@ def create_word_cloud_top(df):
 
     except Exception as e:
         st.error(f"Error creating word clouds: {str(e)}")
-        return None, None, None
+        return None, None #, None
 
 @st.cache_data
-def create_word_cloud_bottom(df):
+def create_word_cloud_bottom(df, selected_group='Province'):
     """Create word clouds for bottom regions with error handling"""
     try:
         # Check if dataframe is empty or has less than required data
         if df.empty:
             st.warning("No data available for word clouds.")
-            return None, None, None
+            return None, None #, None # Changed to return only two values
 
         # Convert tuple index to string if it's a tuple
         if isinstance(df.index[0], tuple):
             df.index = [' '.join(map(str, idx)) for idx in df.index]
+
+        # Always convert index to string (for postal codes)
+        df.index = df.index.astype(str)
 
         # Create a simpler DataFrame with just the required columns
         simple_df = pd.DataFrame({
@@ -403,7 +436,7 @@ def create_word_cloud_bottom(df):
         n_items = min(10, len(sorted_df))
         if n_items == 0:
             st.warning("Not enough data points for word clouds.")
-            return None, None, None
+            return None, None 
 
         # adjusted to head after ascedning = True
         bottom_10 = sorted_df.head(n_items)
@@ -442,7 +475,7 @@ def create_word_cloud_bottom(df):
         # Plot top regions
         ax1.imshow(wc_bottom, interpolation='bilinear')
         ax1.axis('off')
-        ax1.set_title(f"Least Accurate Regions", pad=20, fontsize=16, color=default_text_color)
+        ax1.set_title(f'Least Accurate {selected_group}s', pad=20, fontsize=16, color=default_text_color)
 
 
         # Adjust layout
@@ -457,23 +490,11 @@ def create_word_cloud_bottom(df):
         plt.close()
         buf.seek(0)
 
-        return buf, bottom_10 #,top_10
+        return buf, bottom_10 
 
     except Exception as e:
         st.error(f"Error creating word clouds: {str(e)}")
-        return None, None, None
-
-
-# Add this near the top of your script, with other session state initializations
-if 'filter_settings' not in st.session_state:
-    st.session_state.filter_settings = {
-        'data_type': 'All',
-        'selected_entities': [],
-        'selected_group': 'Province',
-        'selected_region': 'All',
-        'min_recall': 0.0,
-        'group_col': 'province'  # Add default group_col
-    }
+        return None, None 
 
 def main():
     st.title("Model Performance on Prediction Correctness")
@@ -483,30 +504,52 @@ def main():
     if raw_df is None:
         return
     
-    # Initialize default settings if not present
-    if 'filter_settings' not in st.session_state:
-        st.session_state.filter_settings = {
-            'data_type': 'All',
-            'selected_entities': [],
-            'selected_group': 'Province',
-            'selected_region': 'All',
-            'min_recall': 0.0,
-            'group_col': 'province'  # Default group_col
-        }
-    
     # Sidebar filters
     with st.sidebar:
+
+        #just_added
+        # Show popup at the top of sidebar if not dismissed
+        if st.session_state.get('show_popup', True):
+            st.warning("Click 'Apply Filter' to update your settings.")
+            if st.button("Got it"):
+                st.session_state.show_popup = False
+                st.rerun()
+
+
         st.markdown("### Data and Filters")
         
         # Data Type filter
         st.markdown("<b>Data Type:</b>", unsafe_allow_html=True)
         data_types = ['All'] + sorted(raw_df['data_type'].unique().tolist())
         temp_data_type = st.selectbox("Select Data Type", data_types)
-        
+                
+
+        # Tooltip for Prediction Correctness
+        tooltip_text = """
+        Prediction Correctness (%) measures how accurately the NER model identifies predefined Thai address components (district, subdistrict, zipcode, and province) in auto-generated data.
+        <br><br>
+        It is calculated as the number of correctly predicted address components divided by the total number of selected address components, expressed as a percentage.
+        """
+
+
         st.markdown("<hr style='margin: 1rem 0'>", unsafe_allow_html=True)
-        
-        st.markdown("### %Correctness Calculation")
-        
+        st.markdown("""
+            <div class="header-with-icon">
+                <h3 style="margin: 0;">%Correctness Calculation</h3>
+                <div class="tooltip-icon">
+                    ℹ️
+                    <div class="tooltip-text">
+                        Prediction Correctness (%) measures how accurately the NER model identifies predefined Thai address components (district, subdistrict, zipcode, and province) in auto-generated data.
+                        <br><br>
+                        It is calculated as the number of correctly predicted address components divided by the total number of selected address components, expressed as a percentage.
+                    </div>
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
+
         # Entity Selection section
         st.markdown("<b>Address Components:</b>", unsafe_allow_html=True)
         
@@ -571,7 +614,21 @@ def main():
             format="%d%%"
         ) / 100.0
         
-        # Add Apply Filter button
+        # Auto-apply just once at start
+        if st.session_state.get('needs_initial_apply', True):
+            st.session_state.filter_settings.update({
+                'data_type': temp_data_type,
+                'selected_entities': temp_selected_entities,
+                'selected_group': temp_selected_group,
+                'selected_region': temp_selected_region,
+                'min_recall': temp_min_recall,
+                'group_col': temp_group_col
+            })
+            st.session_state.needs_initial_apply = False
+            st.rerun()
+        
+        
+        # Regular Apply Filter button for subsequent updates
         if st.button("Apply Filter"):
             st.session_state.filter_settings.update({
                 'data_type': temp_data_type,
@@ -581,7 +638,8 @@ def main():
                 'min_recall': temp_min_recall,
                 'group_col': temp_group_col
             })
-    
+            # st.experimental_rerun()
+
     # Use the stored filter settings for visualization with safety checks
     settings = st.session_state.filter_settings
     
@@ -622,7 +680,12 @@ def main():
         selected_level = None if settings['selected_region'] == 'All' else settings['selected_region']
         m = create_optimized_map(df, group_col, selected_level, settings['min_recall'])
         if m:
-            st_folium(m, width=550, height=650)
+            st_folium(m
+                      ,width=550
+                      ,height=650
+                      ,key="main_map"  # Add this to prevent reruns on zoom/pan
+                      ,returned_objects=[]  # Add this to prevent returning unnecessary data
+                      )
 
         #Sample Addrress for Each Data Type
         if temp_data_type == 'All':
@@ -681,16 +744,13 @@ def main():
         
         if settings['selected_region'] == 'All' and not filtered_df.empty:
             # Generate word clouds and get top/bottom data
-            word_cloud_image_top, top_10 = create_word_cloud_top(filtered_df)
+            word_cloud_image_top, top_10 = create_word_cloud_top(filtered_df , selected_group=settings['selected_group'])
             
             if word_cloud_image_top is not None:
                 # Display word clouds
                 st.image(word_cloud_image_top)
                 
-            # # Display detailed statistics in expandable sections
-            #     col1, col2 = st.columns(2)    
-               
-                # with col1:
+
                 with st.expander(f"Most Accurate {settings['selected_group']} Details"):
                     if top_10 is not None:
                         st.markdown(f"### Most Accurate {settings['selected_group']}")
@@ -702,7 +762,7 @@ def main():
                     else:
                         st.write("No data available")
                 
-            word_cloud_image_bottom, bottom_10 = create_word_cloud_bottom(filtered_df)
+            word_cloud_image_bottom, bottom_10 = create_word_cloud_bottom(filtered_df , selected_group=settings['selected_group'])
 
             if word_cloud_image_bottom is not None:
                 # Display word clouds
@@ -737,8 +797,17 @@ if __name__ == "__main__":
 # Load the pre-trained model
 @st.cache_data
 def load_model():
-    model = joblib.load(r"NER_model.joblib")
-    return model
+    model_path = 'NER_model.joblib'
+    if os.path.exists(model_path):
+        try:
+            model = joblib.load(model_path)
+            return model
+        except Exception as e:
+            st.error(f"Error loading model: {str(e)}")
+            return None
+    else:
+        st.error(f"Model file {model_path} not found.")
+        return None
 
 model = load_model()
 
@@ -801,7 +870,6 @@ def map_explanation(label):
     return explanation.get(label, "Unknown")
 
 # Set up the Streamlit app
-# st.title("Try out the Named Entity Recognition (NER) model yourself!")
 st.markdown(
     "<h1 style='font-size: 36px;'>Try out the Named Entity Recognition (NER) model yourself!</h1>",
     unsafe_allow_html=True
