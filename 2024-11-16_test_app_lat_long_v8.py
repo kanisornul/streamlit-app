@@ -538,11 +538,11 @@ def main():
                         <br><br>
                         Three address formats were tested:
                         <br>
-                        1. Correct with Full Prefix: Includes "ตำบล" and "อำเภอ" before subdistrict and district.
+                        1. ตำบล อำเภอ: Generated addresses include "ตำบล" and "อำเภอ" before subdistrict and district.
                         <br>
-                        2. Correct with Short Prefix: Includes "ต." and "อ." before subdistrict and district.
+                        2. ต. อ.: Generated addresses include "ต." and "อ." before subdistrict and district.
                         <br>
-                        3. Correct without Prefix: No prefixes before address components.
+                        3. No Prefix: No prefixes are added before any address components.
                     </div>
                 </div>
             </div>
